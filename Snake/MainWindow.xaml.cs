@@ -20,6 +20,7 @@ namespace Snake
     /// </summary>
     public partial class MainWindow : Window
     {
+        Random random = new Random();
         //Поле на котором живет змея
         Entity field;
         // голова змеи
@@ -32,26 +33,44 @@ namespace Snake
         int score;
         //таймер по которому 
         DispatcherTimer moveTimer;
-        
+        // кролик
+        Rabbit rabbit;
+        bool flag = false;
+        // количество кроликов(1 или 0)
+        int amount_of_rabbits = 0;
+
+        bool flag_for_rotate_rabbit = false;
+
+        int x_rabbit_before = 0;
+
         //конструктор формы, выполняется при запуске программы
         public MainWindow()
         {
             InitializeComponent();
-            
+
             snake = new List<PositionedEntity>();
             //создаем поле 300х300 пикселей
             field = new Entity(600, 600, "pack://application:,,,/Resources/snake.png");
 
             //создаем таймер срабатывающий раз в 300 мс
             moveTimer = new DispatcherTimer();
-            moveTimer.Interval = new TimeSpan(0, 0, 0, 0, 300);
+            moveTimer.Interval = new TimeSpan(0, 0, 0, 0, 275);
             moveTimer.Tick += new EventHandler(moveTimer_Tick);
             
+
         }
 
         //метод перерисовывающий экран
         private void UpdateField()
         {
+            int number = random.Next(0, 10);
+            // добавляем кролика
+            if (number == 1 && amount_of_rabbits == 0)
+            {
+                Border_died.Children.Add(rabbit.image);
+                flag = true;
+                amount_of_rabbits++;
+            }
             //обновляем положение элементов змеи
             foreach (var p in snake)
             {
@@ -62,7 +81,13 @@ namespace Snake
             //обновляем положение яблока
             Canvas.SetTop(apple.image, apple.y);
             Canvas.SetLeft(apple.image, apple.x);
-            
+
+            // обновляем положение кролика
+            if (flag == true && amount_of_rabbits == 1)
+            {
+                Canvas.SetTop(rabbit.image, rabbit.y);
+                Canvas.SetLeft(rabbit.image, rabbit.x);
+            }
             //обновляем количество очков
             lblScore.Content = String.Format("{0}000", score);
         }
@@ -75,7 +100,104 @@ namespace Snake
             {
                 p.move();
             }
+            // передвижение кролика
+            if (flag == true && amount_of_rabbits == 1)
+            {
 
+                rabbit.move();
+                // если змейка врезалась в кролика
+                if (head.x == rabbit.x && head.y == rabbit.y)
+                {
+                    score += 25;
+                    amount_of_rabbits--;
+                    Border_died.Children.Remove(rabbit.image);
+                    rabbit.x = random.Next(13) * 40 + 40;
+                    rabbit.y = random.Next(13) * 40 + 40;
+                }
+
+                //повороты кролика
+                if (rabbit.x > x_rabbit_before || flag_for_rotate_rabbit == false)
+                {
+                    x_rabbit_before = rabbit.x;
+                    rabbit.Rotate = Rabbit.Rabbit_direction.RIGHT;
+                    flag_for_rotate_rabbit = true;
+
+                }
+                else if (rabbit.x < x_rabbit_before || flag_for_rotate_rabbit == false)
+                {
+                    x_rabbit_before = rabbit.x;
+                    rabbit.Rotate = Rabbit.Rabbit_direction.LEFT;
+                    flag_for_rotate_rabbit = true;
+                }
+
+                // находим растояние между кроликом и змеёй
+                double s_now = Math.Sqrt(Math.Pow(rabbit.x - head.x, 2) + Math.Pow(rabbit.y - head.y, 2));
+                // если расстояние между кроликом и змеёй <= 50, то увеличиваем ему скорость и он бежит туда где нет змеии
+                if (s_now <= 50)
+                {
+                    if (rabbit.x > head.x)
+                        rabbit.escape(true, false, false, false);
+                    else if (rabbit.x < head.x)
+                        rabbit.escape(false, true, false, false);
+
+                    if (rabbit.y < head.y)
+                        rabbit.escape(false, false, true, false);
+                    else if (rabbit.y > head.y)
+                        rabbit.escape(false, false, false, true);
+
+                    if (rabbit.x == 520 && head.x == 480 && (rabbit.y != 520 || rabbit.y != 40))
+                    {
+                        int rand = random.Next(1, 2);
+                        if (rand == 1)
+                            rabbit.escape(false, false, false, true);
+                        else
+                            rabbit.escape(false, false, true, false);
+                    }
+                    else if (rabbit.y == 520 && head.y == 480 && (rabbit.x != 520 || rabbit.x != 40))
+                    {
+                        int rand1 = random.Next(1, 2);
+                        if (rand1 == 1)
+                            rabbit.escape(true, false, false, false);
+                        else
+                            rabbit.escape(false, true, false, false);
+                    }
+                    else if (rabbit.y == 40 && head.y == 80 && (rabbit.x != 520 || rabbit.x != 40))
+                    {
+                        int rand2 = random.Next(1, 2);
+                        if (rand2 == 1)
+                            rabbit.escape(true, false, false, false);
+                        else
+                            rabbit.escape(false, true, false, false);
+                    }
+                    else if (rabbit.x == 40 && head.x == 80 && (rabbit.y != 520 || rabbit.y != 40))
+                    {
+                        int rand3 = random.Next(1, 2);
+                        if (rand3 == 1)
+                            rabbit.escape(false, false, false, true);
+                        else
+                            rabbit.escape(false, false, true, false);
+                    }
+                }
+
+                // столкновение яблока и кролика
+                if (rabbit.x == apple.x && rabbit.y == apple.y)
+                {
+                    apple.move();
+                }
+
+                //если кролик врежется в тело змеи, то умрёт
+                foreach (var p in snake.Where(x => x != head))
+                {
+                    if (p.x == rabbit.x && p.y == rabbit.y)
+                    {
+                        score += 25;
+                        amount_of_rabbits--;
+                        Border_died.Children.Remove(rabbit.image);
+                        rabbit.x = random.Next(13) * 40 + 40;
+                        rabbit.y = random.Next(13) * 40 + 40;
+                    }
+                }
+            }
             //проверяем, что голова змеи не врезалась в тело
             foreach (var p in snake.Where(x => x != head))
             {
@@ -84,6 +206,7 @@ namespace Snake
                 {
                     //мы проиграли
                     moveTimer.Stop();
+                    button1.Visibility = Visibility.Visible;
                     tbGameOver.Visibility = Visibility.Visible;
                     return;
                 }
@@ -94,6 +217,7 @@ namespace Snake
             {
                 //мы проиграли
                 moveTimer.Stop();
+                button1.Visibility = Visibility.Visible;
                 tbGameOver.Visibility = Visibility.Visible;
                 return;
             }
@@ -107,7 +231,7 @@ namespace Snake
                 apple.move();
                 // добавляем новый сегмент к змее
                 var part = new BodyPart(snake.Last());
-                canvas1.Children.Add(part.image);
+                Border_died.Children.Add(part.image);
                 snake.Add(part);
             }
             //перерисовываем экран
@@ -137,36 +261,38 @@ namespace Snake
         // Обработчик нажатия кнопки "Start"
         private void button1_Click(object sender, RoutedEventArgs e)
         {
+            button1.Visibility = Visibility.Hidden;
             // обнуляем счет
             score = 0;
             // обнуляем змею
             snake.Clear();
             // очищаем канвас
-            canvas1.Children.Clear();
+            Border_died.Children.Clear();
             // скрываем надпись "Game Over"
             tbGameOver.Visibility = Visibility.Hidden;
-            
+            // создаём кролика
+            rabbit = new Rabbit();
             // добавляем поле на канвас
-            canvas1.Children.Add(field.image);
+            Border_died.Children.Add(field.image);
             // создаем новое яблоко и добавлем его
             apple = new Apple(snake);
-            canvas1.Children.Add(apple.image);
+            Border_died.Children.Add(apple.image);
             // создаем голову
             head = new Head();
             snake.Add(head);
-            canvas1.Children.Add(head.image);
-            
+            Border_died.Children.Add(head.image);
+
             //запускаем таймер
             moveTimer.Start();
             UpdateField();
 
         }
-        
+
         public class Entity
         {
             protected int m_width;
             protected int m_height;
-            
+
             Image m_image;
             public Entity(int w, int h, string image)
             {
@@ -230,7 +356,7 @@ namespace Snake
         {
             List<PositionedEntity> m_snake;
             public Apple(List<PositionedEntity> s)
-                : base(0, 0, 40, 40, "pack://application:,,,/Resources/fruit.png")
+                : base(0, 0, 40, 40, "pack://application:,,,/Resources/apple.png")
             {
                 m_snake = s;
                 move();
@@ -259,6 +385,61 @@ namespace Snake
             }
         }
 
+        public class Rabbit : PositionedEntity
+        {
+            Random rand = new Random();
+            public int num1;
+
+            public enum Rabbit_direction
+            {
+                RIGHT, LEFT
+            };
+
+            public Rabbit_direction Rotate
+            {
+                set
+                {
+                    if (value == Rabbit_direction.RIGHT)
+                        image.FlowDirection = FlowDirection.LeftToRight;
+                    else if (value == Rabbit_direction.LEFT)
+                        image.FlowDirection = FlowDirection.RightToLeft;
+                }
+            }
+
+            public Rabbit() : base(0, 0, 40, 40, "pack://application:,,,/Resources/rabbit.png")
+            {
+                image.RenderTransformOrigin = new Point(0.5, 0.5);
+                x = rand.Next(13) * 40 + 40;
+                y = rand.Next(13) * 40 + 40;
+            }
+
+            public override void move()
+            {
+                num1 = rand.Next(1, 5);
+                if (y <= 520 && y > 40 && num1 == 1)
+                    y -= 40;
+                else if (y >= 40 && y < 520 && num1 == 2)
+                    y += 40;
+                else if (x >= 40 && x < 520 && num1 == 3)
+                    x += 40;
+                else if (x <= 520 && x > 40 && num1 == 4)
+                    x -= 40;
+                num1 = 0;
+
+            }
+
+            public void escape(bool flag_for_escape_right, bool flag_for_escape_left, bool flag_for_escape_up, bool flag_for_escape_down)
+            {
+                if (flag_for_escape_right == true && x >= 40 && x < 520)
+                    x += 40;
+                else if (flag_for_escape_left == true && x <= 520 && x > 40)
+                    x -= 40;
+                else if (flag_for_escape_right == true && y >= 40 && y < 520)
+                    y += 40;
+                else if (flag_for_escape_right == true && y <= 520 && y > 40)
+                    y -= 40;
+            }
+        }
         public class Head : PositionedEntity
         {
             public enum Direction
@@ -268,7 +449,8 @@ namespace Snake
 
             Direction m_direction;
 
-            public Direction direction {
+            public Direction direction
+            {
                 set
                 {
                     m_direction = value;
